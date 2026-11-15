@@ -1,0 +1,39 @@
+
+# Import libraries
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+# Load dataset
+data = pd.read_csv(r"C:\Users\sai-pc\Downloads\Wine dataset.csv")
+
+print(data.shape)
+print(data.columns)
+print(data.isnull().sum())
+
+# Select features and class
+X = data.drop("class", axis=1)
+y = data["class"]
+
+# Standardize the data
+sc = StandardScaler()
+X = sc.fit_transform(X)
+
+# Apply PCA
+pca = PCA(n_components=2)
+new_data = pca.fit_transform(X)
+
+# Display results
+print("Original Data:", data.shape)
+print("Reduced Data:", new_data.shape)
+
+print("Explained Variance:")
+print(pca.explained_variance_ratio_)
+
+# Visualize the result
+plt.scatter(new_data[:, 0], new_data[:, 1], c=y)
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.title("PCA on Wine Dataset")
+plt.show()
