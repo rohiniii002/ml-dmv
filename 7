@@ -1,0 +1,102 @@
+
+# Sales Data Analysis using CSV, Excel and JSON
+
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 1. Load CSV file
+csv_data = pd.read_csv(
+    r"C:\Users\sai-pc\Downloads\retail_sales_dataset.csv"
+)
+
+# Create Excel and JSON files from CSV data
+csv_data.to_excel(
+    r"C:\Users\sai-pc\Downloads\retail_sales_dataset.xlsx",
+    index=False
+)
+
+csv_data.to_json(
+    r"C:\Users\sai-pc\Downloads\retail_sales_dataset.json",
+    orient="records"
+)
+
+# Load data from all three formats
+csv_data = pd.read_csv(
+    r"C:\Users\sai-pc\Downloads\retail_sales_dataset.csv"
+)
+
+excel_data = pd.read_excel(
+    r"C:\Users\sai-pc\Downloads\retail_sales_dataset.xlsx"
+)
+
+json_data = pd.read_json(
+    r"C:\Users\sai-pc\Downloads\retail_sales_dataset.json"
+)
+
+# Display first five rows
+print("CSV Data:")
+print(csv_data.head())
+
+print("\nExcel Data:")
+print(excel_data.head())
+
+print("\nJSON Data:")
+print(json_data.head())
+
+# 2. Check data
+print("\nNull Values:")
+print(csv_data.isnull().sum())
+
+print("\nDuplicates:")
+print(csv_data.duplicated().sum())
+
+# 3. Data Cleaning
+data = csv_data.dropna().copy()
+data = data.drop_duplicates()
+
+# 4. Data Transformation
+data["Date"] = pd.to_datetime(data["Date"])
+
+data["Total"] = (
+    data["Quantity"] * data["Price per Unit"]
+)
+
+# 5. Data Analysis
+print("\nTotal Sales:", data["Total"].sum())
+
+print("Average Sales:", data["Total"].mean())
+
+print("\nSales by Category:")
+print(data.groupby("Product Category")["Total"].sum())
+
+# 6. Visualization
+
+# Bar Chart
+data.groupby("Product Category")["Total"].sum().plot(
+    kind="bar"
+)
+
+plt.title("Sales by Category")
+plt.xlabel("Category")
+plt.ylabel("Total Sales")
+plt.tight_layout()
+plt.show()
+
+# Pie Chart
+data["Product Category"].value_counts().plot(
+    kind="pie",
+    autopct="%1.1f%%"
+)
+
+plt.title("Category Distribution")
+plt.ylabel("")
+plt.show()
+
+# Box Plot
+plt.boxplot(data["Total"])
+
+plt.title("Sales Distribution")
+plt.ylabel("Total Sales")
+plt.show()
+
+print("\nProgram Executed Successfully!")
