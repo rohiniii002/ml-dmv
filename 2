@@ -1,0 +1,147 @@
+
+# Practical 2: Regression Analysis
+# Uber Fare Prediction
+
+# 1. Import libraries
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.metrics import r2_score, mean_squared_error
+
+
+# 2. Load dataset
+data = pd.read_csv(r"C:\Users\sai-pc\Downloads\uber.csv")
+
+print("Dataset Shape:", data.shape)
+print("\nDataset Columns:")
+print(data.columns)
+
+
+# 3. Check missing values
+print("\nNull Values:")
+print(data.isnull().sum())
+
+
+# 4. Data Preprocessing
+data = data.drop(
+    ["Unnamed: 0", "key", "pickup_datetime"],
+    axis=1,
+    errors="ignore"
+)
+
+# Remove missing values
+data = data.dropna()
+
+
+# 5. Remove invalid values
+data = data[data["fare_amount"] > 0]
+data = data[data["passenger_count"] > 0]
+
+
+# 6. Create distance feature
+data["distance"] = np.sqrt(
+    (data["dropoff_longitude"] - data["pickup_longitude"])**2 +
+    (data["dropoff_latitude"] - data["pickup_latitude"])**2
+)
+
+print("\nAfter Preprocessing:")
+print(data.head())
+
+
+# 7. Identify and remove outliers using IQR
+Q1 = data["fare_amount"].quantile(0.25)
+Q3 = data["fare_amount"].quantile(0.75)
+
+IQR = Q3 - Q1
+
+lower = Q1 - 1.5 * IQR
+upper = Q3 + 1.5 * IQR
+
+print("\nOutlier Limits:")
+print("Lower:", lower)
+print("Upper:", upper)
+
+data = data[
+    (data["fare_amount"] >= lower) &
+    (data["fare_amount"] <= upper)
+]
+
+
+# 8. Correlation Analysis
+print("\nCorrelation:")
+print(data.corr())
+
+
+# 9. Prepare input and output
+X = data.drop("fare_amount", axis=1)
+y = data["fare_amount"]
+
+
+# 10. Split dataset into training and testing
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y,
+    test_size=0.2,
+    random_state=42
+)
+
+
+# 11. Linear Regression
+linear = LinearRegression()
+linear.fit(X_train, y_train)
+
+pred1 = linear.predict(X_test)
+
+
+# 12. Ridge Regression
+ridge = Ridge()
+ridge.fit(X_train, y_train)
+
+pred2 = ridge.predict(X_test)
+
+
+# 13. Lasso Regression
+lasso = Lasso()
+lasso.fit(X_train, y_train)
+
+pred3 = lasso.predict(X_test)
+
+
+# 14. Compare all three models
+models = ["Linear", "Ridge", "Lasso"]
+predictions = [pred1, pred2, pred3]
+
+for model, pred in zip(models, predictions):
+
+    r2 = r2_score(y_test, pred)
+
+    rmse = np.sqrt(
+        mean_squared_error(y_test, pred)
+    )
+
+    print("\n", model, "Regression")
+    print("R2 Score:", r2)
+    print("RMSE:", rmse)
+
+
+# 15. Correlation Matrix Graph
+plt.figure(figsize=(8, 6))
+
+plt.imshow(data.corr(), cmap="coolwarm")
+
+plt.colorbar()
+plt.title("Correlation Matrix")
+plt.xticks(
+    range(len(data.columns)),
+    data.columns,
+    rotation=90
+)
+plt.yticks(
+    range(len(data.columns)),
+    data.columns
+)
+
+plt.tight_layout()
+plt.show()
