@@ -85,3 +85,575 @@ plt.xticks(range(3), ["Temperature", "Humidity", "Wind Speed"])
 plt.yticks(range(3), ["Temperature", "Humidity", "Wind Speed"])
 plt.title("Weather Correlation")
 plt.show()
+
+
+
+
+# PRACTICAL: INTERACTING WITH WEB APIs
+# Problem Statement: Analyzing Weather Data using OpenWeatherMap API
+
+# --------------------------------------------------
+# STEP 1: IMPORT REQUIRED LIBRARIES
+# --------------------------------------------------
+
+import requests
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import folium
+import warnings
+
+warnings.filterwarnings("ignore")
+
+sns.set_style("whitegrid")
+
+print("Libraries imported successfully!")
+
+
+# --------------------------------------------------
+# STEP 2: ENTER OPENWEATHERMAP API KEY
+# --------------------------------------------------
+
+API_KEY = "c53f06b7689c9917b61c35386fec12e1"
+
+if API_KEY == "YOUR_API_KEY_HERE":
+    raise ValueError("Please enter your OpenWeatherMap API key.")
+
+# OpenWeatherMap 5-day forecast API
+API_URL = "https://api.openweathermap.org/data/2.5/forecast"
+
+
+# --------------------------------------------------
+# STEP 3: DEFINE CITIES AND COORDINATES
+# --------------------------------------------------
+
+cities = {
+    "Pune": (18.5204, 73.8567),
+    "Mumbai": (19.0760, 72.8777),
+    "Nashik": (19.9975, 73.7898),
+    "Nagpur": (21.1458, 79.0882)
+}
+
+weather_records = []
+
+
+# --------------------------------------------------
+# STEP 4: FETCH WEATHER DATA FROM API
+# --------------------------------------------------
+
+print("\nFetching weather data from OpenWeatherMap API...\n")
+
+for city, coordinates in cities.items():
+
+    latitude, longitude = coordinates
+
+    params = {
+        "lat": latitude,
+        "lon": longitude,
+        "appid": API_KEY,
+        "units": "metric"
+    }
+
+    try:
+
+        response = requests.get(
+            API_URL,
+            params=params,
+            timeout=30
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        # Extract weather information
+        for item in data["list"]:
+
+            main_data = item.get("main", {})
+            wind_data = item.get("wind", {})
+            rain_data = item.get("rain", {})
+            weather_data = item.get("weather", [{}])[0]
+
+            record = {
+                "City": city,
+                "Date_Time": item.get("dt_txt"),
+                "Temperature": main_data.get("temp"),
+                "Min_Temperature": main_data.get("temp_min"),
+                "Max_Temperature": main_data.get("temp_max"),
+                "Humidity": main_data.get("humidity"),
+                "Pressure": main_data.get("pressure"),
+                "Wind_Speed": wind_data.get("speed"),
+                "Precipitation": rain_data.get("3h", 0),
+                "Weather": weather_data.get("description", "Unknown"),
+                "Cloudiness": item.get("clouds", {}).get("all"),
+                "Latitude": latitude,
+                "Longitude": longitude
+            }
+
+            weather_records.append(record)
+
+        print(f"{city}: Weather data retrieved successfully!")
+
+    except requests.exceptions.HTTPError:
+
+        print(f"API error for {city}: {response.text}")
+
+    except requests.exceptions.RequestException as e:
+
+        print(f"Connection error for {city}: {e}")
+
+    except (KeyError, TypeError, IndexError) as e:
+
+        print(f"Invalid response for {city}: {e}")
+
+
+# --------------------------------------------------
+# STEP 5: CREATE DATAFRAME
+# --------------------------------------------------
+
+df = pd.DataFrame(weather_records)
+
+if df.empty:
+    raise ValueError(
+        "No weather data retrieved. Check your API key and internet connection."
+    )
+
+print("\nFirst Five Records:")
+print(df.head())
+
+print("\nDataset Shape:")
+print(df.shape)
+
+print("\nDataset Information:")
+df.info()
+
+
+# --------------------------------------------------
+# STEP 6: DATA CLEANING AND PREPROCESSING
+# --------------------------------------------------
+
+# Convert date and time into datetime format
+df["Date_Time"] = pd.to_datetime(
+    df["Date_Time"],
+    errors="coerce"
+)
+
+# Convert numerical columns into numeric format
+numeric_columns = [
+    "Temperature",
+    "Min_Temperature",
+    "Max_Temperature",
+    "Humidity",
+    "Pressure",
+    "Wind_Speed",
+    "Precipitation",
+    "Cloudiness"
+]
+
+for col in numeric_columns:
+
+    df[col] = pd.to_numeric(
+        df[col],
+        errors="coerce"
+    )
+
+# Replace infinite values with NaN
+df.replace([np.inf, -np.inf], np.nan, inplace=True)
+
+# Remove rows with missing date and city
+df.dropna(
+    subset=["Date_Time", "City"],
+    inplace=True
+)
+
+# Fill missing numerical values using median
+for col in numeric_columns:
+
+    if df[col].notna().any():
+
+        df[col] = df[col].fillna(
+            df[col].median()
+        )
+
+# Fill missing weather descriptions
+df["Weather"] = df["Weather"].fillna("Unknown")
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+print("\nCleaned Weather Dataset:")
+print(df.head())
+
+
+# --------------------------------------------------
+# STEP 7: ADD DATE, MONTH AND TIME COLUMNS
+# --------------------------------------------------
+
+df["Date"] = df["Date_Time"].dt.date
+
+df["Month"] = df["Date_Time"].dt.month_name()
+
+df["Hour"] = df["Date_Time"].dt.hour
+
+df["Day"] = df["Date_Time"].dt.day_name()
+
+print("\nDataset After Adding Date and Time Columns:")
+print(df.head())
+
+
+# --------------------------------------------------
+# STEP 8: DESCRIPTIVE STATISTICS
+# --------------------------------------------------
+
+print("\nOverall Weather Statistics:")
+
+print(df[numeric_columns].describe())
+
+
+# City-wise average weather statistics
+
+city_statistics = df.groupby("City")[numeric_columns].mean()
+
+print("\nCity-wise Average Weather Statistics:")
+
+print(city_statistics)
+
+
+# Maximum and minimum temperature
+
+print("\nMaximum Temperature:")
+
+print(df.groupby("City")["Temperature"].max())
+
+
+print("\nMinimum Temperature:")
+
+print(df.groupby("City")["Temperature"].min())
+
+
+# --------------------------------------------------
+# STEP 9: DATA AGGREGATION
+# --------------------------------------------------
+
+# Daily weather aggregation
+
+daily_weather = df.groupby(
+    ["City", "Date"]
+)[numeric_columns].mean().reset_index()
+
+print("\nDaily Weather Summary:")
+
+print(daily_weather.head())
+
+
+# Monthly weather aggregation
+
+monthly_weather = df.groupby(
+    ["City", "Month"]
+)[numeric_columns].mean().reset_index()
+
+print("\nMonthly Weather Summary:")
+
+print(monthly_weather.head())
+
+
+# --------------------------------------------------
+# STEP 10: TEMPERATURE TREND LINE CHART
+# --------------------------------------------------
+
+plt.figure(figsize=(12, 6))
+
+sns.lineplot(
+    data=df,
+    x="Date_Time",
+    y="Temperature",
+    hue="City",
+    marker="o"
+)
+
+plt.title("Temperature Changes Over Time")
+plt.xlabel("Date and Time")
+plt.ylabel("Temperature (°C)")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+
+# --------------------------------------------------
+# STEP 11: CITY-WISE AVERAGE TEMPERATURE
+# --------------------------------------------------
+
+plt.figure(figsize=(10, 6))
+
+sns.barplot(
+    data=df,
+    x="City",
+    y="Temperature",
+    estimator=np.mean,
+    errorbar=None
+)
+
+plt.title("Average Temperature by City")
+plt.xlabel("City")
+plt.ylabel("Temperature (°C)")
+plt.tight_layout()
+plt.show()
+
+
+# --------------------------------------------------
+# STEP 12: PRECIPITATION ANALYSIS
+# --------------------------------------------------
+
+plt.figure(figsize=(10, 6))
+
+rainfall = df.groupby("City")["Precipitation"].sum().reset_index()
+
+sns.barplot(
+    data=rainfall,
+    x="City",
+    y="Precipitation",
+    errorbar=None
+)
+
+plt.title("Total Forecast Precipitation by City")
+plt.xlabel("City")
+plt.ylabel("Precipitation (mm)")
+plt.tight_layout()
+plt.show()
+
+
+# --------------------------------------------------
+# STEP 13: WIND SPEED ANALYSIS
+# --------------------------------------------------
+
+plt.figure(figsize=(10, 6))
+
+sns.barplot(
+    data=df,
+    x="City",
+    y="Wind_Speed",
+    estimator=np.mean,
+    errorbar=None
+)
+
+plt.title("Average Wind Speed by City")
+plt.xlabel("City")
+plt.ylabel("Wind Speed (m/s)")
+plt.tight_layout()
+plt.show()
+
+
+# --------------------------------------------------
+# STEP 14: HUMIDITY ANALYSIS
+# --------------------------------------------------
+
+plt.figure(figsize=(10, 6))
+
+sns.lineplot(
+    data=df,
+    x="Date_Time",
+    y="Humidity",
+    hue="City",
+    marker="o"
+)
+
+plt.title("Humidity Changes Over Time")
+plt.xlabel("Date and Time")
+plt.ylabel("Humidity (%)")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+
+# --------------------------------------------------
+# STEP 15: TEMPERATURE VS HUMIDITY SCATTER PLOT
+# --------------------------------------------------
+
+plt.figure(figsize=(10, 6))
+
+sns.scatterplot(
+    data=df,
+    x="Temperature",
+    y="Humidity",
+    hue="City",
+    alpha=0.7
+)
+
+plt.title("Relationship Between Temperature and Humidity")
+plt.xlabel("Temperature (°C)")
+plt.ylabel("Humidity (%)")
+plt.tight_layout()
+plt.show()
+
+
+# --------------------------------------------------
+# STEP 16: CORRELATION ANALYSIS
+# --------------------------------------------------
+
+correlation_columns = [
+    "Temperature",
+    "Humidity",
+    "Pressure",
+    "Wind_Speed",
+    "Precipitation",
+    "Cloudiness"
+]
+
+correlation_matrix = df[correlation_columns].corr()
+
+print("\nWeather Data Correlation Matrix:")
+
+print(correlation_matrix)
+
+
+plt.figure(figsize=(10, 7))
+
+sns.heatmap(
+    correlation_matrix,
+    annot=True,
+    cmap="coolwarm",
+    fmt=".2f",
+    linewidths=0.5
+)
+
+plt.title("Weather Attributes Correlation Heatmap")
+plt.tight_layout()
+plt.show()
+
+
+# --------------------------------------------------
+# STEP 17: GEOGRAPHICAL VISUALIZATION USING FOLIUM
+# --------------------------------------------------
+
+weather_map = folium.Map(
+    location=[20.5, 78.5],
+    zoom_start=6
+)
+
+for city, coordinates in cities.items():
+
+    latitude, longitude = coordinates
+
+    city_data = df[df["City"] == city].sort_values("Date_Time")
+
+    if not city_data.empty:
+
+        latest = city_data.iloc[0]
+
+        popup_text = f"""
+        <b>City:</b> {city}<br>
+        <b>Temperature:</b> {latest['Temperature']:.2f} °C<br>
+        <b>Humidity:</b> {latest['Humidity']:.2f}%<br>
+        <b>Wind Speed:</b> {latest['Wind_Speed']:.2f} m/s<br>
+        <b>Precipitation:</b> {latest['Precipitation']:.2f} mm<br>
+        <b>Weather:</b> {latest['Weather']}
+        """
+
+        folium.Marker(
+            location=[latitude, longitude],
+            popup=folium.Popup(
+                popup_text,
+                max_width=300
+            ),
+            tooltip=city,
+            icon=folium.Icon(
+                color="blue",
+                icon="cloud"
+            )
+        ).add_to(weather_map)
+
+# Save map
+weather_map.save("Weather_Map.html")
+
+print("\nWeather map saved successfully!")
+
+
+# --------------------------------------------------
+# STEP 18: EXPORT DATA INTO DIFFERENT FILE FORMATS
+# --------------------------------------------------
+
+# Export cleaned weather data
+df.to_csv(
+    "OpenWeather_Data.csv",
+    index=False
+)
+
+df.to_excel(
+    "OpenWeather_Data.xlsx",
+    index=False
+)
+
+df.to_json(
+    "OpenWeather_Data.json",
+    orient="records",
+    indent=4
+)
+
+# Export aggregated data
+daily_weather.to_csv(
+    "Daily_Weather_Summary.csv",
+    index=False
+)
+
+monthly_weather.to_csv(
+    "Monthly_Weather_Summary.csv",
+    index=False
+)
+
+print("\nAll files exported successfully!")
+
+
+# --------------------------------------------------
+# STEP 19: FINAL WEATHER SUMMARY
+# --------------------------------------------------
+
+print("\n========== FINAL WEATHER SUMMARY ==========")
+
+for city in cities.keys():
+
+    city_data = df[df["City"] == city]
+
+    if not city_data.empty:
+
+        print(f"\nCity: {city}")
+
+        print(
+            "Average Temperature:",
+            round(city_data["Temperature"].mean(), 2),
+            "°C"
+        )
+
+        print(
+            "Maximum Temperature:",
+            round(city_data["Temperature"].max(), 2),
+            "°C"
+        )
+
+        print(
+            "Minimum Temperature:",
+            round(city_data["Temperature"].min(), 2),
+            "°C"
+        )
+
+        print(
+            "Average Humidity:",
+            round(city_data["Humidity"].mean(), 2),
+            "%"
+        )
+
+        print(
+            "Average Wind Speed:",
+            round(city_data["Wind_Speed"].mean(), 2),
+            "m/s"
+        )
+
+        print(
+            "Total Precipitation:",
+            round(city_data["Precipitation"].sum(), 2),
+            "mm"
+        )
+
+print("\n============================================")
+
+print("WEATHER DATA ANALYSIS COMPLETED SUCCESSFULLY!")
